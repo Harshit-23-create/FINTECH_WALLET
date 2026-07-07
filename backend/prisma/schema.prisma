@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String        @id @default(uuid())
+  email            String        @unique
+  passwordHash     String
+  twoFactorSecret  String?
+  isTwoFactorEnabled Boolean     @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  wallet           Wallet?
+  cards            Card[]
+  sentTransactions Transaction[] @relation("Sender")
+  receivedTransactions Transaction[] @relation("Receiver")
+  sentRequests     PaymentRequest[] @relation("RequestSender")
+  receivedRequests PaymentRequest[] @relation("RequestReceiver")
+  alerts           Alert[]
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  balance   Float    @default(0.0)
+  currency  String   @default("USD")
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id           String   @id @default(uuid())
+  amount       Float
+  currency     String   @default("USD")
+  exchangeRate Float    @default(1.0)
+  status       String   @default("PENDING") // PENDING, COMPLETED, FAILED, FLAGGED
+  senderId     String?
+  sender       User?    @relation("Sender", fields: [senderId], references: [id])
+  receiverId   String?
+  receiver     User?    @relation("Receiver", fields: [receiverId], references: [id])
+  description  String?
+  category     String   @default("GENERAL")
+  createdAt    DateTime @default(now())
+  
+  alerts       Alert[]
+}
+
+model Alert {
+  id            String      @id @default(uuid())
+  type          String      // e.g., "HIGH_VALUE_TRANSFER", "VELOCITY_ALERT"
+  message       String
+  isRead        Boolean     @default(false)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime    @default(now())
+}
+
+model Card {
+  id         String   @id @default(uuid())
+  cardNumber String   @unique
+  expiry     String
+  cvv        String
+  status     String   @default("ACTIVE")
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model PaymentRequest {
+  id           String   @id @default(uuid())
+  amount       Float
+  currency     String   @default("USD")
+  description  String?
+  status       String   @default("PENDING") // PENDING, PAID, REJECTED
+  senderId     String
+  sender       User     @relation("RequestSender", fields: [senderId], references: [id])
+  receiverId   String
+  receiver     User     @relation("RequestReceiver", fields: [receiverId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
